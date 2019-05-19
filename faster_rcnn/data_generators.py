@@ -1,11 +1,14 @@
 from __future__ import absolute_import
-import numpy as np
-import cv2
-import random
-import copy
-from . import data_augment
-import threading
+
 import itertools
+import random
+import threading
+
+import cv2
+import numpy as np
+
+from . import data_augment
+
 
 def get_img_output_length(width, height):
 	def get_output_length(input_length):
@@ -35,11 +38,12 @@ def intersection(ai, bi):
 	h = min(ai[3], bi[3]) - y
 	if w < 0 or h < 0:
 		return 0
-	return w*h
+	return w * h
+
 
 def normalize_img(x_img, C):
 	# Zero-center by mean pixel, and preprocess image
-	x_img = x_img[:,:, (2, 1, 0)]  # BGR -> RGB
+	x_img = x_img[:, :, (2, 1, 0)]  # BGR -> RGB
 	x_img = x_img.astype(np.float32)
 	x_img[:, :, 0] -= C.img_channel_mean[0]
 	x_img[:, :, 1] -= C.img_channel_mean[1]
@@ -49,6 +53,7 @@ def normalize_img(x_img, C):
 	x_img = np.transpose(x_img, (2, 0, 1))
 	x_img = np.expand_dims(x_img, axis=0)
 	return x_img
+
 
 def iou(a, b):
 	# a and b should be (x1,y1,x2,y2)
@@ -105,17 +110,16 @@ class SampleSelector:
 
 
 def calc_rpn(C, img_data, width, height, resized_width, resized_height):
-
 	downscale = float(C.rpn_stride)
 	anchor_sizes = C.anchor_box_scales
 	anchor_ratios = C.anchor_box_ratios
-	num_anchors = len(anchor_sizes) * len(anchor_ratios)	
+	num_anchors = len(anchor_sizes) * len(anchor_ratios)
 
 	# calculate the output map size based on the network architecture
 	(output_width, output_height) = get_img_output_length(resized_width, resized_height)
 
 	n_anchratios = len(anchor_ratios)
-	
+
 	# initialise empty output objectives
 	y_rpn_overlap = np.zeros((output_height, output_width, num_anchors))
 	y_is_box_valid = np.zeros((output_height, output_width, num_anchors))
@@ -124,7 +128,7 @@ def calc_rpn(C, img_data, width, height, resized_width, resized_height):
 	num_bboxes = len(img_data['bboxes'])
 
 	num_anchors_for_bbox = np.zeros(num_bboxes).astype(int)
-	best_anchor_for_bbox = -1*np.ones((num_bboxes, 4)).astype(int)
+	best_anchor_for_bbox = -1 * np.ones((num_bboxes, 4)).astype(int)
 	best_iou_for_bbox = np.zeros(num_bboxes).astype(np.float32)
 	best_x_for_bbox = np.zeros((num_bboxes, 4)).astype(int)
 	best_dx_for_bbox = np.zeros((num_bboxes, 4)).astype(np.float32)
@@ -137,22 +141,22 @@ def calc_rpn(C, img_data, width, height, resized_width, resized_height):
 		gta[bbox_num, 1] = bbox['x2'] * (resized_width / float(width))
 		gta[bbox_num, 2] = bbox['y1'] * (resized_height / float(height))
 		gta[bbox_num, 3] = bbox['y2'] * (resized_height / float(height))
-	
+
 	# rpn ground truth
 	for anchor_size_idx in range(len(anchor_sizes)):
 		for anchor_ratio_idx in range(n_anchratios):
 			anchor_x = anchor_sizes[anchor_size_idx] * anchor_ratios[anchor_ratio_idx][0]
-			anchor_y = anchor_sizes[anchor_size_idx] * anchor_ratios[anchor_ratio_idx][1]	
-			
-			for ix in range(output_width):					
-				# x-coordinates of the current anchor box	
+			anchor_y = anchor_sizes[anchor_size_idx] * anchor_ratios[anchor_ratio_idx][1]
+
+			for ix in range(output_width):
+				# x-coordinates of the current anchor box
 				x1_anc = downscale * (ix + 0.5) - anchor_x / 2
-				x2_anc = downscale * (ix + 0.5) + anchor_x / 2	
-				
-				# ignore boxes that go across image boundaries					
+				x2_anc = downscale * (ix + 0.5) + anchor_x / 2
+
+				# ignore boxes that go across image boundaries
 				if x1_anc < 0 or x2_anc > resized_width:
 					continue
-					
+
 				for jy in range(output_height):
 
 					# y-coordinates of the current anchor box
@@ -163,7 +167,7 @@ def calc_rpn(C, img_data, width, height, resized_width, resized_height):
 					if y1_anc < 0 or y2_anc > resized_height:
 						continue
 
-					# bbox_type indicates whether an anchor should be a target 
+					# bbox_type indicates whether an anchor should be a target
 					bbox_type = 'neg'
 
 					# this is the best IOU for the (x,y) coord and the current anchor
@@ -171,29 +175,30 @@ def calc_rpn(C, img_data, width, height, resized_width, resized_height):
 					best_iou_for_loc = 0.0
 
 					for bbox_num in range(num_bboxes):
-						
+
 						# get IOU of the current GT box and the current anchor box
-						curr_iou = iou([gta[bbox_num, 0], gta[bbox_num, 2], gta[bbox_num, 1], gta[bbox_num, 3]], [x1_anc, y1_anc, x2_anc, y2_anc])
+						curr_iou = iou([gta[bbox_num, 0], gta[bbox_num, 2], gta[bbox_num, 1], gta[bbox_num, 3]],
+						               [x1_anc, y1_anc, x2_anc, y2_anc])
 						# calculate the regression targets if they will be needed
 						if curr_iou > best_iou_for_bbox[bbox_num] or curr_iou > C.rpn_max_overlap:
 							cx = (gta[bbox_num, 0] + gta[bbox_num, 1]) / 2.0
 							cy = (gta[bbox_num, 2] + gta[bbox_num, 3]) / 2.0
-							cxa = (x1_anc + x2_anc)/2.0
-							cya = (y1_anc + y2_anc)/2.0
+							cxa = (x1_anc + x2_anc) / 2.0
+							cya = (y1_anc + y2_anc) / 2.0
 
 							tx = (cx - cxa) / (x2_anc - x1_anc)
 							ty = (cy - cya) / (y2_anc - y1_anc)
 							tw = np.log((gta[bbox_num, 1] - gta[bbox_num, 0]) / (x2_anc - x1_anc))
 							th = np.log((gta[bbox_num, 3] - gta[bbox_num, 2]) / (y2_anc - y1_anc))
-						
+
 						if img_data['bboxes'][bbox_num]['class'] != 'bg':
 
 							# all GT boxes should be mapped to an anchor box, so we keep track of which anchor box was best
 							if curr_iou > best_iou_for_bbox[bbox_num]:
 								best_anchor_for_bbox[bbox_num] = [jy, ix, anchor_ratio_idx, anchor_size_idx]
 								best_iou_for_bbox[bbox_num] = curr_iou
-								best_x_for_bbox[bbox_num,:] = [x1_anc, x2_anc, y1_anc, y2_anc]
-								best_dx_for_bbox[bbox_num,:] = [tx, ty, tw, th]
+								best_x_for_bbox[bbox_num, :] = [x1_anc, x2_anc, y1_anc, y2_anc]
+								best_dx_for_bbox[bbox_num, :] = [tx, ty, tw, th]
 
 							# we set the anchor to positive if the IOU is >0.7 (it does not matter if there was another better box, it just indicates overlap)
 							if curr_iou > C.rpn_max_overlap:
@@ -221,7 +226,7 @@ def calc_rpn(C, img_data, width, height, resized_width, resized_height):
 						y_is_box_valid[jy, ix, anchor_ratio_idx + n_anchratios * anchor_size_idx] = 1
 						y_rpn_overlap[jy, ix, anchor_ratio_idx + n_anchratios * anchor_size_idx] = 1
 						start = 4 * (anchor_ratio_idx + n_anchratios * anchor_size_idx)
-						y_rpn_regr[jy, ix, start:start+4] = best_regr
+						y_rpn_regr[jy, ix, start:start + 4] = best_regr
 
 	# we ensure that every bbox has at least one positive RPN region
 	for idx in range(num_anchors_for_bbox.shape[0]):
@@ -230,14 +235,16 @@ def calc_rpn(C, img_data, width, height, resized_width, resized_height):
 			if best_anchor_for_bbox[idx, 0] == -1:
 				continue
 			y_is_box_valid[
-				best_anchor_for_bbox[idx,0], best_anchor_for_bbox[idx,1], best_anchor_for_bbox[idx,2] + n_anchratios *
-				best_anchor_for_bbox[idx,3]] = 1
+				best_anchor_for_bbox[idx, 0], best_anchor_for_bbox[idx, 1], best_anchor_for_bbox[
+					idx, 2] + n_anchratios *
+				best_anchor_for_bbox[idx, 3]] = 1
 			y_rpn_overlap[
-				best_anchor_for_bbox[idx,0], best_anchor_for_bbox[idx,1], best_anchor_for_bbox[idx,2] + n_anchratios *
-				best_anchor_for_bbox[idx,3]] = 1
-			start = 4 * (best_anchor_for_bbox[idx,2] + n_anchratios * best_anchor_for_bbox[idx,3])
+				best_anchor_for_bbox[idx, 0], best_anchor_for_bbox[idx, 1], best_anchor_for_bbox[
+					idx, 2] + n_anchratios *
+				best_anchor_for_bbox[idx, 3]] = 1
+			start = 4 * (best_anchor_for_bbox[idx, 2] + n_anchratios * best_anchor_for_bbox[idx, 3])
 			y_rpn_regr[
-				best_anchor_for_bbox[idx,0], best_anchor_for_bbox[idx,1], start:start+4] = best_dx_for_bbox[idx, :]
+			best_anchor_for_bbox[idx, 0], best_anchor_for_bbox[idx, 1], start:start + 4] = best_dx_for_bbox[idx, :]
 
 	y_rpn_overlap = np.transpose(y_rpn_overlap, (2, 0, 1))
 	y_rpn_overlap = np.expand_dims(y_rpn_overlap, axis=0)
@@ -257,10 +264,10 @@ def calc_rpn(C, img_data, width, height, resized_width, resized_height):
 	# regions. We also limit it to 256 regions.
 	num_regions = 256
 
-	if len(pos_locs[0]) > num_regions/2:
-		val_locs = random.sample(range(len(pos_locs[0])), len(pos_locs[0]) - num_regions/2)
+	if len(pos_locs[0]) > num_regions / 2:
+		val_locs = random.sample(range(len(pos_locs[0])), len(pos_locs[0]) - num_regions / 2)
 		y_is_box_valid[0, pos_locs[0][val_locs], pos_locs[1][val_locs], pos_locs[2][val_locs]] = 0
-		num_pos = num_regions/2
+		num_pos = num_regions / 2
 
 	if len(neg_locs[0]) + num_pos > num_regions:
 		val_locs = random.sample(range(len(neg_locs[0])), len(neg_locs[0]) - num_pos)
@@ -276,6 +283,7 @@ class threadsafe_iter:
 	"""Takes an iterator/generator and makes it thread-safe by
 	serializing call to the `next` method of given iterator/generator.
 	"""
+
 	def __init__(self, it):
 		self.it = it
 		self.lock = threading.Lock()
@@ -285,15 +293,18 @@ class threadsafe_iter:
 
 	def next(self):
 		with self.lock:
-			return next(self.it)		
+			return next(self.it)
 
-	
+
 def threadsafe_generator(f):
 	"""A decorator that takes a generator function and makes it thread-safe.
 	"""
+
 	def g(*a, **kw):
 		return threadsafe_iter(f(*a, **kw))
+
 	return g
+
 
 def get_anchor_gt(all_img_data, class_count, C, backend, mode='train'):
 	sample_selector = SampleSelector(class_count)
@@ -331,7 +342,7 @@ def get_anchor_gt(all_img_data, class_count, C, backend, mode='train'):
 					continue
 				x_img = normalize_img(x_img, C)
 
-				y_rpn_regr[:, y_rpn_regr.shape[1]//2:, :, :] *= C.std_scaling
+				y_rpn_regr[:, y_rpn_regr.shape[1] // 2:, :, :] *= C.std_scaling
 
 				if backend == 'tf':
 					x_img = np.transpose(x_img, (0, 2, 3, 1))

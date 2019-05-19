@@ -1,6 +1,7 @@
+import copy
+
 import cv2
 import numpy as np
-import copy
 
 
 def augment(img_data, config, augment=True):
@@ -33,14 +34,14 @@ def augment(img_data, config, augment=True):
 				bbox['y1'] = rows - y2
 
 		if config.rot_90:
-			angle = np.random.choice([0,90,180,270],1)[0]
+			angle = np.random.choice([0, 90, 180, 270], 1)[0]
 			if angle == 270:
-				img = np.transpose(img, (1,0,2))
+				img = np.transpose(img, (1, 0, 2))
 				img = cv2.flip(img, 0)
 			elif angle == 180:
 				img = cv2.flip(img, -1)
 			elif angle == 90:
-				img = np.transpose(img, (1,0,2))
+				img = np.transpose(img, (1, 0, 2))
 				img = cv2.flip(img, 1)
 			elif angle == 0:
 				pass
@@ -64,7 +65,7 @@ def augment(img_data, config, augment=True):
 					bbox['x1'] = rows - y2
 					bbox['x2'] = rows - y1
 					bbox['y1'] = x1
-					bbox['y2'] = x2        
+					bbox['y2'] = x2
 				elif angle == 0:
 					pass
 
