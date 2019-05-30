@@ -117,6 +117,7 @@ class ResNet50Config(Config):
 		                                               include_top=False, weights='imagenet')
 
 
+
 class VGG16Config(Config):
 	model_name = 'vgg16'
 	img_size = 224
@@ -150,6 +151,8 @@ class XceptionConfig(Config):
 		                                      include_top=False, weights='imagenet')
 
 
-all_configs = [DenseNet121Config, DenseNet169Config, DenseNet201Config, InceptionResNetV2Config, InceptionV3Config,
-               MobileNetConfig, MobileNetV2Config, NASNetLargeConfig, NASNetMobileConfig, ResNet50Config, VGG16Config,
-               VGG19Config, XceptionConfig]
+all_configs = [ResNet50Config,
+               #DenseNet121Config, DenseNet169Config, DenseNet201Config, InceptionResNetV2Config, InceptionV3Config,
+               #MobileNetConfig, MobileNetV2Config, NASNetLargeConfig, NASNetMobileConfig, ResNet50Config, VGG16Config,
+               #VGG19Config, XceptionConfig
+               ]
