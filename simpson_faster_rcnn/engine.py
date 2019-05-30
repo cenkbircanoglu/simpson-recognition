@@ -11,7 +11,7 @@ import torchnet as tnt
 import torchvision.transforms as transforms
 from tqdm import tqdm
 
-from wildcat.util import AveragePrecisionMeter, Warp
+from simpson_faster_rcnn.util import AveragePrecisionMeter, Warp
 
 
 class Engine(object):
@@ -83,7 +83,7 @@ class Engine(object):
 	def on_end_batch(self, training, model, criterion, data_loader, optimizer=None, display=True):
 
 		# record loss
-		self.state['loss_batch'] = self.state['loss'].data[0]
+		self.state['loss_batch'] = self.state['loss'].data.item()
 		self.state['meter_loss'].add(self.state['loss_batch'])
 
 		if display and self.state['print_freq'] != 0 and self.state['iteration'] % self.state['print_freq'] == 0:

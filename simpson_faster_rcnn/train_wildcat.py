@@ -1,24 +1,31 @@
 import argparse
+import inspect
+import os
+import sys
+
+currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+parentdir = os.path.dirname(currentdir)
+sys.path.insert(0, parentdir)
 
 import torch
 import torch.nn as nn
 
-from wildcat.engine import MulticlassEngine
-from wildcat.mit67 import Mit67
-from wildcat.models import resnet101_wildcat
+from simpson_faster_rcnn.engine import MulticlassEngine
+from simpson_faster_rcnn.models import resnet101_wildcat, resnet50_wildcat
+from simpson_faster_rcnn.simpson import SimpsonDataset
 
 parser = argparse.ArgumentParser(description='WILDCAT Training')
-parser.add_argument('data', metavar='DIR',
+parser.add_argument('--data', metavar='DIR', default="../simpson_faster_rcnn/datasets/",
                     help='path to dataset (e.g. ../data/')
 parser.add_argument('--image-size', '-i', default=224, type=int,
-                    metavar='N', help='image size (default: 224)')
+                    metavar='N', help='image size (default: 64)')
 parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                     help='number of data loading workers (default: 4)')
 parser.add_argument('--epochs', default=20, type=int, metavar='N',
                     help='number of total epochs to run')
 parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                     help='manual epoch number (useful on restarts)')
-parser.add_argument('-b', '--batch-size', default=16, type=int,
+parser.add_argument('-b', '--batch-size', default=4, type=int,
                     metavar='N', help='mini-batch size (default: 256)')
 parser.add_argument('--lr', '--learning-rate', default=0.1, type=float,
                     metavar='LR', help='initial learning rate')
@@ -42,39 +49,39 @@ parser.add_argument('--maps', default=1, type=int,
                     metavar='N', help='number of maps per class (default: 1)')
 
 
-def main_voc2007():
-	global args, best_prec1, use_gpu
-	args = parser.parse_args()
+def main_simpson():
+    global args, best_prec1, use_gpu
+    args = parser.parse_args()
 
-	use_gpu = torch.cuda.is_available()
+    use_gpu = torch.cuda.is_available()
 
-	# define dataset
-	train_dataset = Mit67(args.data, 'train')
-	val_dataset = Mit67(args.data, 'test')
-	num_classes = 67
+    # define dataset
+    train_dataset = SimpsonDataset(args.data, 'train')
+    val_dataset = SimpsonDataset(args.data, 'test')
+    num_classes = len(val_dataset.classes)
 
-	# load model
-	model = resnet101_wildcat(num_classes, pretrained=True, kmax=args.k, alpha=args.alpha, num_maps=args.maps)
-	print('classifier', model.classifier)
-	print('spatial pooling', model.spatial_pooling)
+    # load model
+    model = resnet50_wildcat(num_classes, pretrained=True, kmax=args.k, alpha=args.alpha, num_maps=args.maps)
+    print('classifier', model.classifier)
+    print('spatial pooling', model.spatial_pooling)
 
-	# define loss function (criterion)
-	criterion = nn.CrossEntropyLoss()
+    # define loss function (criterion)
+    criterion = nn.CrossEntropyLoss()
 
-	# define optimizer
-	optimizer = torch.optim.SGD(model.get_config_optim(args.lr, args.lrp),
-	                            lr=args.lr,
-	                            momentum=args.momentum,
-	                            weight_decay=args.weight_decay)
+    # define optimizer
+    optimizer = torch.optim.SGD(model.get_config_optim(args.lr, args.lrp),
+                                lr=args.lr,
+                                momentum=args.momentum,
+                                weight_decay=args.weight_decay)
 
-	state = {'batch_size': args.batch_size, 'image_size': args.image_size, 'max_epochs': args.epochs,
-	         'evaluate': args.evaluate, 'resume': args.resume}
-	state['difficult_examples'] = True
-	state['save_model_path'] = '../expes/models/mit67/'
+    state = {'batch_size': args.batch_size, 'image_size': args.image_size, 'max_epochs': args.epochs,
+             'evaluate': args.evaluate, 'resume': args.resume}
+    state['difficult_examples'] = True
+    state['save_model_path'] = '../expes/models/simpson/'
 
-	engine = MulticlassEngine(state)
-	engine.learning(model, criterion, train_dataset, val_dataset, optimizer)
+    engine = MulticlassEngine(state)
+    engine.learning(model, criterion, train_dataset, val_dataset, optimizer)
 
 
 if __name__ == '__main__':
-	main_voc2007()
+    main_simpson()

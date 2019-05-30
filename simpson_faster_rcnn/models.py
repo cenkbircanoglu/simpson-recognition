@@ -1,7 +1,7 @@
 import torch.nn as nn
 import torchvision.models as models
 
-from wildcat.pooling import WildcatPool2d, ClassWisePool
+from simpson_faster_rcnn.pooling import WildcatPool2d, ClassWisePool
 
 
 class ResNetWSL(nn.Module):
